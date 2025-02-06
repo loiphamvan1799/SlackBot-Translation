@@ -65,6 +65,15 @@ slackApp.message(async ({ message, say }) => {
   console.log("⚡ Bot Slack đã chạy!");
 })();
 
+
+app.post('/slack/events', (req, res) => {
+    const { challenge } = req.body;
+    if (challenge) {
+      return res.status(200).send({ challenge });
+    }
+    // Tiếp tục xử lý các yêu cầu khác...
+  });
+  
 // ⚠️ Thêm server Express để Render không tự động đóng ứng dụng
 const app = express();
 const PORT = process.env.PORT || 3000;
