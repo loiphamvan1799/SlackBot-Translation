@@ -1,9 +1,10 @@
 require("dotenv").config();
 const { App } = require("@slack/bolt");
 const axios = require("axios");
+const express = require("express");
 
 // Khởi tạo Slack bot
-const app = new App({
+const slackApp = new App({
   token: process.env.SLACK_BOT_TOKEN,
   signingSecret: process.env.SLACK_SIGNING_SECRET,
 });
@@ -11,12 +12,10 @@ const app = new App({
 // Hàm phát hiện ngôn ngữ
 async function detectLanguage(text) {
   try {
-    const res = await axios.post(`${process.env.LIBRETRANSLATE_API}`, {
+    const res = await axios.post(`${process.env.LIBRETRANSLATE_API}/detect`, {
       q: text,
-      source: "auto",
-      target: "en",
     });
-    return res.data.detected || "unknown";
+    return res.data[0]?.language || "unknown";
   } catch (error) {
     console.error("Lỗi phát hiện ngôn ngữ:", error);
     return "unknown";
@@ -26,12 +25,12 @@ async function detectLanguage(text) {
 // Hàm dịch văn bản
 async function translate(text, targetLang) {
   try {
-    const res = await axios.post(`${process.env.LIBRETRANSLATE_API}`, {
+    const res = await axios.post(`${process.env.LIBRETRANSLATE_API}/translate`, {
       q: text,
       source: "auto",
       target: targetLang,
     });
-    return res.data.translatedText;
+    return res.data.translatedText || text;
   } catch (error) {
     console.error("Lỗi dịch văn bản:", error);
     return text;
@@ -39,7 +38,7 @@ async function translate(text, targetLang) {
 }
 
 // Lắng nghe tin nhắn trong kênh Slack
-app.message(async ({ message, say }) => {
+slackApp.message(async ({ message, say }) => {
   if (message.subtype === "bot_message") return; // Bỏ qua tin nhắn từ bot
 
   const text = message.text;
@@ -48,19 +47,30 @@ app.message(async ({ message, say }) => {
   if (lang === "ja") {
     const viText = await translate(text, "vi");
     const enText = await translate(text, "en");
-    await say(`📢 Dịch từ **Tiếng Nhật**:\n🇻🇳 Tiếng Việt: ${viText}\n🇬🇧 Tiếng Anh: ${enText}`);
+    await say(`🇻🇳 ${viText}\n🇬🇧 ${enText}`);
   } else if (lang === "vi") {
     const jaText = await translate(text, "ja");
     const enText = await translate(text, "en");
-    await say(`📢 Dịch từ **Tiếng Việt**:\n🇯🇵 Tiếng Nhật: ${jaText}\n🇬🇧 Tiếng Anh: ${enText}`);
+    await say(`🇯🇵 ${jaText}\n🇬🇧 ${enText}`);
   } else if (lang === "en") {
     const jaText = await translate(text, "ja");
     const viText = await translate(text, "vi");
-    await say(`📢 Dịch từ **Tiếng Anh**:\n🇯🇵 Tiếng Nhật: ${jaText}\n🇻🇳 Tiếng Việt: ${viText}`);
+    await say(`🇯🇵 ${jaText}\n🇻🇳 ${viText}`);
   }
 });
 
-// Khởi chạy bot
+// Khởi chạy Slack bot
 (async () => {
+  await slackApp.start();
   console.log("⚡ Bot Slack đã chạy!");
 })();
+
+// ⚠️ Thêm server Express để Render không tự động đóng ứng dụng
+const app = express();
+const PORT = process.env.PORT || 3000;
+
+app.get("/", (req, res) => {
+  res.send("Slack Bot đang chạy!");
+});
+
+app.listen(PORT, () => console.log(`🌍 Server listening on port ${PORT}`));
