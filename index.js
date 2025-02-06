@@ -62,6 +62,5 @@ app.message(async ({ message, say }) => {
 
 // Khởi chạy bot
 (async () => {
-  await app.start(process.env.PORT || 3000);
   console.log("⚡ Bot Slack đã chạy!");
 })();
