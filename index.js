@@ -1,28 +1,56 @@
 require("dotenv").config();
-const { App } = require("@slack/bolt");
-const axios = require("axios");
 const express = require("express");
+const axios = require("axios");
 
-// Khởi tạo Slack bot
-const slackApp = new App({
-  token: process.env.SLACK_BOT_TOKEN,
-  signingSecret: process.env.SLACK_SIGNING_SECRET,
+const app = express();
+const PORT = process.env.PORT || 3000;
+
+// Middleware xử lý JSON
+app.use(express.json());
+
+// ✅ Route xử lý dịch ngôn ngữ (Test bằng Postman hoặc Slack)
+app.post("/translate", async (req, res) => {
+  try {
+    const { text } = req.body;
+    if (!text) {
+      return res.status(400).json({ error: "Thiếu dữ liệu văn bản cần dịch" });
+    }
+
+    // 🟢 Phát hiện ngôn ngữ gốc
+    const detectRes = await axios.post(`${process.env.LIBRETRANSLATE_API}/detect`, { q: text });
+    const lang = detectRes.data[0]?.language || "unknown";
+
+    let translations = {};
+    if (lang === "ja") {
+      translations = {
+        vi: await translate(text, "vi"),
+        en: await translate(text, "en"),
+      };
+    } else if (lang === "vi") {
+      translations = {
+        ja: await translate(text, "ja"),
+        en: await translate(text, "en"),
+      };
+    } else if (lang === "en") {
+      translations = {
+        ja: await translate(text, "ja"),
+        vi: await translate(text, "vi"),
+      };
+    } else {
+      return res.status(400).json({ error: "Không xác định được ngôn ngữ" });
+    }
+
+    res.json({
+      detected_language: lang,
+      translations,
+    });
+  } catch (error) {
+    console.error("Lỗi dịch văn bản:", error);
+    res.status(500).json({ error: "Lỗi hệ thống" });
+  }
 });
 
-// Hàm phát hiện ngôn ngữ
-async function detectLanguage(text) {
-  try {
-    const res = await axios.post(`${process.env.LIBRETRANSLATE_API}/detect`, {
-      q: text,
-    });
-    return res.data[0]?.language || "unknown";
-  } catch (error) {
-    console.error("Lỗi phát hiện ngôn ngữ:", error);
-    return "unknown";
-  }
-}
-
-// Hàm dịch văn bản
+// 🟢 Hàm dịch văn bản
 async function translate(text, targetLang) {
   try {
     const res = await axios.post(`${process.env.LIBRETRANSLATE_API}/translate`, {
@@ -32,54 +60,20 @@ async function translate(text, targetLang) {
     });
     return res.data.translatedText || text;
   } catch (error) {
-    console.error("Lỗi dịch văn bản:", error);
+    console.error(`Lỗi dịch sang ${targetLang}:`, error);
     return text;
   }
 }
 
-// Lắng nghe tin nhắn trong kênh Slack
-slackApp.message(async ({ message, say }) => {
-  if (message.subtype === "bot_message") return; // Bỏ qua tin nhắn từ bot
-
-  const text = message.text;
-  const lang = await detectLanguage(text);
-
-  if (lang === "ja") {
-    const viText = await translate(text, "vi");
-    const enText = await translate(text, "en");
-    await say(`🇻🇳 ${viText}\n🇬🇧 ${enText}`);
-  } else if (lang === "vi") {
-    const jaText = await translate(text, "ja");
-    const enText = await translate(text, "en");
-    await say(`🇯🇵 ${jaText}\n🇬🇧 ${enText}`);
-  } else if (lang === "en") {
-    const jaText = await translate(text, "ja");
-    const viText = await translate(text, "vi");
-    await say(`🇯🇵 ${jaText}\n🇻🇳 ${viText}`);
+// ✅ Xử lý challenge từ Slack khi thêm Event Subscriptions
+app.post("/slack/events", async (req, res) => {
+  if (req.body.type === "url_verification") {
+    return res.json({ challenge: req.body.challenge });
   }
+  res.status(200).send("OK");
 });
 
-// Khởi chạy Slack bot
-(async () => {
-  await slackApp.start();
-  console.log("⚡ Bot Slack đã chạy!");
-})();
-
-
-// ⚠️ Thêm server Express để Render không tự động đóng ứng dụng
-const app = express();
-const PORT = process.env.PORT || 3000;
-
-app.post('/slack/events', (req, res) => {
-    const { challenge } = req.body;
-    if (challenge) {
-      return res.status(200).send({ challenge });
-    }
-    // Tiếp tục xử lý các yêu cầu khác...
-  });
-
-app.get("/", (req, res) => {
-  res.send("Slack Bot đang chạy!");
+// Khởi động server
+app.listen(PORT, () => {
+  console.log(`🚀 Server đang chạy trên cổng ${PORT}`);
 });
-
-app.listen(PORT, () => console.log(`🌍 Server listening on port ${PORT}`));
