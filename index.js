@@ -1,12 +1,14 @@
 require('dotenv').config();
 const { App } = require('@slack/bolt');
 const axios = require('axios');
+const express = require("express"); 
 
 const app = new App({
     token: process.env.SLACK_BOT_TOKEN,
     signingSecret: process.env.SLACK_SIGNING_SECRET
 });
 
+const expressApp = express();
 const PORT = process.env.PORT || 3000;
 
 async function translateText(text, targetLang) {
@@ -66,6 +68,13 @@ app.event('message', async ({ event, client }) => {
     });
 });
 
-app.listen(PORT, () => {
-    console.log("⚡ Slack Bot is running!");
+expressApp.get("/", (req, res) => {
+  res.send("Slack Bot is running!");
+});
+
+(async () => {
+  await app.start();
+  expressApp.listen(PORT, () => {
+      console.log(`⚡ Slack Bot & API running on port ${PORT}!`);
+  });
 })();
