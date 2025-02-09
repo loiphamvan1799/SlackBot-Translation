@@ -11,6 +11,16 @@ const app = new App({
 const expressApp = express();
 const PORT = process.env.PORT || 3000;
 
+// Middleware để parse JSON body
+expressApp.use(express.json());
+
+expressApp.post("/slack/events", async (req, res) => {
+    if (req.body.type === "url_verification") {
+        console.log("Slack challenge received!");
+        return res.json({ challenge: req.body.challenge });
+    }
+});
+
 async function translateText(text, targetLang) {
     try {
         const response = await axios.post(
