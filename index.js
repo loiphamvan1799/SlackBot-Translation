@@ -7,6 +7,8 @@ const app = new App({
     signingSecret: process.env.SLACK_SIGNING_SECRET
 });
 
+const PORT = process.env.PORT || 3000;
+
 async function translateText(text, targetLang) {
     try {
         const response = await axios.post(
@@ -64,7 +66,6 @@ app.event('message', async ({ event, client }) => {
     });
 });
 
-(async () => {
-    await app.start(3000);
+app.listen(PORT, () => {
     console.log("⚡ Slack Bot is running!");
 })();
