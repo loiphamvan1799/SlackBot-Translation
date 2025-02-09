@@ -22,7 +22,7 @@ expressApp.post("", async (req, res) => {
 });
 
 // 📌 API test dịch thuật bằng Postman
-app.post('/translate', async (req, res) => {
+expressApp.post('/translate', async (req, res) => {
   const { text, targetLang } = req.body;
 
   if (!text || !targetLang) {
